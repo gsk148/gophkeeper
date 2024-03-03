@@ -3,16 +3,18 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"github.com/go-chi/chi/v5"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/gsk148/gophkeeper/internal/app/server/services"
+	"github.com/gsk148/gophkeeper/internal/app/server/storage"
 )
 
 func (h Handler) GetAllCards() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uid := r.Context().Value("uid").(string)
-		cs, err := services.GetAllCards(h.db, uid)
+		cs, err := services.GetAllCards(r.Context(), h.db, uid)
 		if err != nil {
 			handleHTTPError(w, err, http.StatusInternalServerError)
 			return
@@ -29,14 +31,14 @@ func (h Handler) GetCardByID() http.HandlerFunc {
 		uid := r.Context().Value("uid").(string)
 		id := chi.URLParam(r, "id")
 
-		c, err := services.GetCardByID(h.db, uid, id)
-		if err != nil && err.Error() != "stored card not found" {
+		c, err := services.GetCardByID(r.Context(), h.db, uid, id)
+		if err != nil && errors.Is(err, storage.ErrNotFound) {
 			handleHTTPError(w, err, http.StatusInternalServerError)
 			return
 		}
 
 		if c.ID == "" {
-			handleHTTPError(w, errors.New("data not found"), http.StatusNotFound)
+			handleHTTPError(w, storage.ErrNotFound, http.StatusNotFound)
 			return
 		}
 
@@ -57,7 +59,7 @@ func (h Handler) StoreCard() http.HandlerFunc {
 			return
 		}
 
-		id, err := services.StoreCard(h.db, uid, req)
+		id, err := services.StoreCard(r.Context(), h.db, uid, req)
 		if err != nil {
 			handleHTTPError(w, err, http.StatusInternalServerError)
 			return

@@ -1,5 +1,12 @@
 package storage
 
+import (
+	"context"
+	"errors"
+)
+
+var ErrNotFound = errors.New("data not found")
+
 type Type int
 
 const (
@@ -16,22 +23,23 @@ type IRepository interface {
 }
 
 type IDataRepository interface {
-	GetAllData(uid string) ([]SecureData, error)
-	GetAllDataByType(uid string, t Type) ([]SecureData, error)
-	GetDataByID(uid, id string) (SecureData, error)
-	StoreData(data SecureData) (string, error)
+	GetAllDataByType(ctx context.Context, uid string, t Type) ([]SecureData, error)
+	GetDataByID(ctx context.Context, uid, id string) (SecureData, error)
+	StoreData(ctx context.Context, data SecureData) (string, error)
+	DeleteData(ctx context.Context, uid, id string) error
 }
 
 type ISessionRepository interface {
-	DeleteSession(cid string) error
-	GetSession(cid string) (string, error)
-	StoreSession(cid, token string) error
+	DeleteSession(ctx context.Context, cid string) error
+	GetSession(ctx context.Context, cid string) (string, error)
+	StoreSession(ctx context.Context, cid, token string) error
 }
 
 type IUserRepository interface {
-	AddUser(name, pwd string) (User, error)
-	GetUserByID(string) (User, error)
-	GetUserByName(string) (User, error)
+	AddUser(ctx context.Context, user User) (User, error)
+	DeleteUser(ctx context.Context, uid string) error
+	GetUserByID(ctx context.Context, uid string) (User, error)
+	GetUserByName(ctx context.Context, name string) (User, error)
 }
 
 type SecureData struct {
@@ -47,6 +55,6 @@ type User struct {
 	Password string `json:"password"`
 }
 
-func NewStorage() IRepository {
-	return NewBasicStorage()
+func NewStorage() (IRepository, error) {
+	return NewBasicStorage(), nil
 }

@@ -12,8 +12,8 @@ import (
 )
 
 type Handler struct {
-	db storage.IRepository
-	as services.AuthService
+	db   storage.IRepository
+	auth services.AuthService
 }
 
 func NewHandler(db storage.IRepository) *chi.Mux {
@@ -62,8 +62,8 @@ func initHandler(db storage.IRepository) Handler {
 	us := services.NewUserService(db)
 	ss := services.NewSessionService(db)
 	return Handler{
-		db: db,
-		as: services.NewAuthService(ss, us),
+		db:   db,
+		auth: services.NewAuthService(ss, us),
 	}
 }
 
