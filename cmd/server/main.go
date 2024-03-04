@@ -39,7 +39,7 @@ func main() {
 }
 
 func getServer() *http.Server {
-	db, err := storage.NewStorage()
+	db, err := storage.NewStorage("postgres://postgres:postgres@localhost:5432/gophkeeper?sslmode=disable")
 	if err != nil {
 		log.Fatal(err)
 	}

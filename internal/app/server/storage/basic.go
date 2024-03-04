@@ -74,9 +74,9 @@ func (s *BasicStorage) GetUserByName(ctx context.Context, name string) (User, er
 		return true
 	})
 
-	//if user.ID == "" {
-	//	return User{}, ErrNotFound
-	//}
+	if user.ID == "" {
+		return User{}, ErrNotFound
+	}
 
 	return user, nil
 }

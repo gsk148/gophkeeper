@@ -65,7 +65,7 @@ func getUserFromRequest(r AuthReq) storage.User {
 
 func doesUserExist(ctx context.Context, db storage.IUserRepository, user storage.User) (bool, error) {
 	su, err := db.GetUserByName(ctx, user.Name)
-	if err != nil && errors.Is(err, storage.ErrNotFound) {
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return false, err
 	}
 

@@ -6,6 +6,7 @@ import (
 )
 
 var ErrNotFound = errors.New("data not found")
+var ErrDBMissingURL = errors.New("db url is missing")
 
 type Type int
 
@@ -55,6 +56,10 @@ type User struct {
 	Password string `json:"password"`
 }
 
-func NewStorage() (IRepository, error) {
+func NewStorage(dbURL string) (IRepository, error) {
+	if dbURL != "" {
+		return NewDBStorage(dbURL)
+	}
+
 	return NewBasicStorage(), nil
 }
