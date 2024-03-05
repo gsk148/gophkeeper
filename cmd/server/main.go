@@ -53,7 +53,7 @@ func getServer() *http.Server {
 }
 
 func startServer(s *http.Server) {
-	if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := s.ListenAndServeTLS("internal/app/cert/server.crt", "internal/app/cert/server.key"); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Error(err)
 	}
 }
