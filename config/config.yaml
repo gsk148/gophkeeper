@@ -1,0 +1,11 @@
+dsn: "postgres://postgres:postgres@localhost:5432/gophkeeper?sslmode=disable"
+database:
+  username: "postgres"
+  password: "postgres"
+  host: "127.0.0.1"
+  port: "5432"
+  name: "gophkeeper"
+  sslmode: "disable"
+http_server:
+  addr: "localhost:8081"
+

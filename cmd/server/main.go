@@ -12,6 +12,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/gsk148/gophkeeper/internal/app/config"
 	"github.com/gsk148/gophkeeper/internal/app/server/handlers"
 	"github.com/gsk148/gophkeeper/internal/app/server/storage"
 )
@@ -23,7 +24,8 @@ var (
 
 func main() {
 	printCompilationInfo()
-	s := getServer()
+	cfg := config.MustLoad()
+	s := getServer(cfg)
 	idleConnectionsClosed := make(chan any)
 
 	go func() {
@@ -38,17 +40,23 @@ func main() {
 	<-idleConnectionsClosed
 }
 
-func getServer() *http.Server {
-	db, err := storage.NewStorage("postgres://postgres:postgres@localhost:5432/gophkeeper?sslmode=disable")
+func getServer(cfg *config.Config) *http.Server {
+	db, err := storage.NewStorage(
+		fmt.Sprintf("host=%s port=%s user=%s dbname=%s password=%s sslmode=%s",
+			cfg.Host,
+			cfg.Port,
+			cfg.Username,
+			cfg.Name,
+			cfg.Password,
+			cfg.Sslmode))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	h := handlers.NewHandler(db)
 	return &http.Server{
-		Addr:              "localhost:8081",
-		Handler:           h,
-		ReadHeaderTimeout: 5 * time.Second,
+		Addr:    cfg.Addr,
+		Handler: h,
 	}
 }
 
