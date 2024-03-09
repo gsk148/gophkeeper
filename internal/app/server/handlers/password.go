@@ -7,14 +7,29 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/gsk148/gophkeeper/internal/app/server/models"
 	"github.com/gsk148/gophkeeper/internal/app/server/services"
-	"github.com/gsk148/gophkeeper/internal/app/server/storage"
 )
+
+func (h Handler) DeletePassword() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid := r.Context().Value(uidKey).(string)
+		id := chi.URLParam(r, "id")
+
+		if err := h.passwordService.DeletePassword(r.Context(), uid, id); err != nil {
+			handleHTTPError(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(""))
+	}
+}
 
 func (h Handler) GetAllPasswords() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid := r.Context().Value("uid").(string)
-		ps, err := services.GetAllPasswords(r.Context(), h.db, uid)
+		uid := r.Context().Value(uidKey).(string)
+		ps, err := h.passwordService.GetAllPasswords(r.Context(), uid)
 		if err != nil {
 			handleHTTPError(w, err, http.StatusInternalServerError)
 			return
@@ -28,11 +43,11 @@ func (h Handler) GetAllPasswords() http.HandlerFunc {
 
 func (h Handler) GetPasswordByID() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid := r.Context().Value("uid").(string)
+		uid := r.Context().Value(uidKey).(string)
 		id := chi.URLParam(r, "id")
 
-		p, err := services.GetPasswordByID(r.Context(), h.db, uid, id)
-		if err != nil && errors.Is(err, storage.ErrNotFound) {
+		p, err := h.passwordService.GetPasswordByID(r.Context(), uid, id)
+		if err != nil && errors.Is(err, services.ErrPasswordNotFound) {
 			handleHTTPError(w, err, http.StatusInternalServerError)
 			return
 		}
@@ -51,15 +66,15 @@ func (h Handler) GetPasswordByID() http.HandlerFunc {
 
 func (h Handler) StorePassword() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid := r.Context().Value("uid").(string)
+		uid := r.Context().Value(uidKey).(string)
 
-		var req services.PasswordReq
+		var req models.PasswordRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			handleHTTPError(w, err, http.StatusBadRequest)
 			return
 		}
 
-		id, err := services.StorePassword(r.Context(), h.db, uid, req)
+		id, err := h.passwordService.StorePassword(r.Context(), uid, req)
 		if err != nil {
 			handleHTTPError(w, err, http.StatusInternalServerError)
 			return

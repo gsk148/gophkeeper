@@ -12,9 +12,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/gsk148/gophkeeper/internal/app/config"
+	"github.com/gsk148/gophkeeper/internal/app/server/config"
 	"github.com/gsk148/gophkeeper/internal/app/server/handlers"
-	"github.com/gsk148/gophkeeper/internal/app/server/storage"
 )
 
 var (
@@ -22,10 +21,19 @@ var (
 	buildDate    string
 )
 
+type ServerConfig interface {
+	GetRepoURL() string
+	GetServerAddress() string
+	IsServerSecure() bool
+}
+
 func main() {
 	printCompilationInfo()
-	cfg := config.MustLoad()
-	s := getServer(cfg)
+	sCfg := config.MustLoad()
+	s, err := getServer(sCfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 	idleConnectionsClosed := make(chan any)
 
 	go func() {
@@ -36,33 +44,36 @@ func main() {
 		close(idleConnectionsClosed)
 	}()
 
-	go startServer(s)
+	go startServer(s, sCfg)
 	<-idleConnectionsClosed
 }
 
-func getServer(cfg *config.Config) *http.Server {
-	db, err := storage.NewStorage(
-		fmt.Sprintf("host=%s port=%s user=%s dbname=%s password=%s sslmode=%s",
-			cfg.Host,
-			cfg.Port,
-			cfg.Username,
-			cfg.Name,
-			cfg.Password,
-			cfg.Sslmode))
+func getServer(sCfg ServerConfig) (*http.Server, error) {
+	h, err := handlers.NewHandler(sCfg.GetRepoURL())
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	h := handlers.NewHandler(db)
-	return &http.Server{
-		Addr:    cfg.Addr,
-		Handler: h,
+	s := &http.Server{
+		Addr:              sCfg.GetServerAddress(),
+		Handler:           h,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
+
+	return s, nil
 }
 
-func startServer(s *http.Server) {
-	if err := s.ListenAndServeTLS("internal/app/cert/server.crt", "internal/app/cert/server.key"); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Error(err)
+func startServer(s *http.Server, sCfg ServerConfig) {
+	if sCfg.IsServerSecure() {
+		err := s.ListenAndServeTLS("internal/app/cert/server.crt", "internal/app/cert/server.key")
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal(err)
+		}
+	} else {
+		err := s.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal(err)
+		}
 	}
 }
 

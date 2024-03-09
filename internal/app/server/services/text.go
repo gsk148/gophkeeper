@@ -2,70 +2,61 @@ package services
 
 import (
 	"context"
+	"errors"
 
-	"github.com/gsk148/gophkeeper/internal/app/server/storage"
+	"github.com/gsk148/gophkeeper/internal/app/server/models"
+	"github.com/gsk148/gophkeeper/internal/pkg/services/data"
+	"github.com/gsk148/gophkeeper/internal/pkg/services/text"
 )
 
-type TextReq struct {
-	Name string `json:"name"`
-	Data string `json:"data"`
-	Note string `json:"note"`
+type TextService struct {
+	textMS text.Service
 }
 
-type TextRes struct {
-	UID  string `json:"-"`
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Data string `json:"data"`
-	Note string `json:"note"`
+var ErrNotFound = errors.New("requested text data not found")
+
+func NewTextService(dataMS data.Service) *TextService {
+	return &TextService{textMS: text.NewService(dataMS)}
 }
 
-func GetAllTexts(ctx context.Context, db storage.IDataRepository, uid string) ([]TextRes, error) {
-	sd, err := db.GetAllDataByType(ctx, uid, storage.SText)
+func (s *TextService) DeleteText(ctx context.Context, uid, id string) error {
+	return s.textMS.DeleteText(ctx, uid, id)
+}
+
+func (s *TextService) GetAllTexts(ctx context.Context, uid string) ([]models.TextResponse, error) {
+	resp, err := s.textMS.GetAllTexts(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 
-	texts := make([]TextRes, 0, len(sd))
-	for _, d := range sd {
-		t, dErr := getTextFromSecureData(d)
-		if dErr != nil {
-			return nil, err
-		}
-
-		t.Data = ""
-		texts = append(texts, t)
+	texts := make([]models.TextResponse, 0, len(resp))
+	for _, c := range resp {
+		texts = append(texts, s.getResponseFromModel(c))
 	}
-
 	return texts, nil
 }
 
-func GetTextByID(ctx context.Context, db storage.IDataRepository, uid, id string) (TextRes, error) {
-	sd, err := db.GetDataByID(ctx, uid, id)
-	if err != nil {
-		return TextRes{}, err
+func (s *TextService) GetTextByID(ctx context.Context, uid, id string) (models.TextResponse, error) {
+	res, err := s.textMS.GetTextByID(ctx, uid, id)
+	return s.getResponseFromModel(res), err
+}
+
+func (s *TextService) StoreText(ctx context.Context, uid string, req models.TextRequest) (string, error) {
+	return s.textMS.StoreText(ctx, s.getModelFromRequest(uid, req))
+}
+
+func (s *TextService) getResponseFromModel(model text.Text) models.TextResponse {
+	return models.TextResponse{
+		UID:  model.UID,
+		ID:   model.ID,
+		Name: model.Name,
+		Data: model.Data,
+		Note: model.Note,
 	}
-	return getTextFromSecureData(sd)
 }
 
-func StoreText(ctx context.Context, db storage.IDataRepository, uid string, req TextReq) (string, error) {
-	text := getTextFromRequest(uid, req)
-	return StoreSecureDataFromPayload(ctx, db, uid, text, storage.SPassword)
-}
-
-func getTextFromSecureData(d storage.SecureData) (TextRes, error) {
-	t, err := GetDataFromBytes(d.Data, storage.SText)
-	if err != nil {
-		return TextRes{}, err
-	}
-
-	tt := t.(TextRes)
-	tt.ID = d.ID
-	return tt, nil
-}
-
-func getTextFromRequest(uid string, req TextReq) TextRes {
-	return TextRes{
+func (s *TextService) getModelFromRequest(uid string, req models.TextRequest) text.Text {
+	return text.Text{
 		UID:  uid,
 		Name: req.Name,
 		Data: req.Data,

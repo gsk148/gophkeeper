@@ -2,70 +2,62 @@ package services
 
 import (
 	"context"
-	"github.com/gsk148/gophkeeper/internal/app/server/storage"
+	"errors"
+
+	"github.com/gsk148/gophkeeper/internal/app/server/models"
+	"github.com/gsk148/gophkeeper/internal/pkg/services/data"
+	"github.com/gsk148/gophkeeper/internal/pkg/services/password"
 )
 
-type PasswordReq struct {
-	Name     string `json:"name"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	Note     string `json:"note"`
+var ErrPasswordNotFound = errors.New("requested password data not found")
+
+type PasswordService struct {
+	passwordMS password.Service
 }
 
-type PasswordRes struct {
-	UID      string `json:"-"`
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	Note     string `json:"note"`
+func NewPasswordService(dataMS data.Service) *PasswordService {
+	return &PasswordService{passwordMS: password.NewService(dataMS)}
 }
 
-func GetAllPasswords(ctx context.Context, db storage.IDataRepository, uid string) ([]PasswordRes, error) {
-	encPass, err := db.GetAllDataByType(ctx, uid, storage.SPassword)
+func (s *PasswordService) DeletePassword(ctx context.Context, uid, id string) error {
+	return s.passwordMS.DeletePassword(ctx, uid, id)
+}
+
+func (s *PasswordService) GetAllPasswords(ctx context.Context, uid string) ([]models.PasswordResponse, error) {
+	resp, err := s.passwordMS.GetAllPasswords(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 
-	ps := make([]PasswordRes, 0, len(encPass))
-	for _, ec := range encPass {
-		p, eErr := getPasswordFromSecureData(ec)
-		if eErr != nil {
-			return nil, eErr
-		}
-
-		p.Password = "********"
-		ps = append(ps, p)
+	passwords := make([]models.PasswordResponse, 0, len(resp))
+	for _, c := range resp {
+		passwords = append(passwords, s.getResponseFromModel(c))
 	}
-	return ps, nil
+	return passwords, nil
 }
 
-func GetPasswordByID(ctx context.Context, db storage.IDataRepository, uid, id string) (PasswordRes, error) {
-	ep, err := db.GetDataByID(ctx, uid, id)
-	if err != nil {
-		return PasswordRes{}, nil
+func (s *PasswordService) GetPasswordByID(ctx context.Context, uid, id string) (models.PasswordResponse, error) {
+	res, err := s.passwordMS.GetPasswordByID(ctx, uid, id)
+	return s.getResponseFromModel(res), err
+}
+
+func (s *PasswordService) StorePassword(ctx context.Context, uid string, req models.PasswordRequest) (string, error) {
+	return s.passwordMS.StorePassword(ctx, s.getModelFromRequest(uid, req))
+}
+
+func (s *PasswordService) getResponseFromModel(model password.Password) models.PasswordResponse {
+	return models.PasswordResponse{
+		UID:      model.UID,
+		ID:       model.ID,
+		Name:     model.Name,
+		User:     model.User,
+		Password: model.Password,
+		Note:     model.Note,
 	}
-	return getPasswordFromSecureData(ep)
 }
 
-func StorePassword(ctx context.Context, db storage.IDataRepository, uid string, req PasswordReq) (string, error) {
-	pass := getPasswordFromRequest(uid, req)
-	return StoreSecureDataFromPayload(ctx, db, uid, pass, storage.SPassword)
-}
-
-func getPasswordFromSecureData(d storage.SecureData) (PasswordRes, error) {
-	p, err := GetDataFromBytes(d.Data, storage.SPassword)
-	if err != nil {
-		return PasswordRes{}, err
-	}
-
-	pt := p.(PasswordRes)
-	pt.ID = d.ID
-	return pt, nil
-}
-
-func getPasswordFromRequest(uid string, req PasswordReq) PasswordRes {
-	return PasswordRes{
+func (s *PasswordService) getModelFromRequest(uid string, req models.PasswordRequest) password.Password {
+	return password.Password{
 		UID:      uid,
 		Name:     req.Name,
 		User:     req.User,

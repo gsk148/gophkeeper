@@ -2,75 +2,64 @@ package services
 
 import (
 	"context"
+	"errors"
 
-	"github.com/gsk148/gophkeeper/internal/app/server/storage"
+	"github.com/gsk148/gophkeeper/internal/app/server/models"
+	"github.com/gsk148/gophkeeper/internal/pkg/services/card"
+	"github.com/gsk148/gophkeeper/internal/pkg/services/data"
 )
 
-type CardReq struct {
-	Name    string `json:"name"`
-	Number  string `json:"number"`
-	Holder  string `json:"holder"`
-	ExpDate string `json:"exp_date"`
-	CVV     string `json:"cvv"`
-	Note    string `json:"note"`
+type CardService struct {
+	cardMS card.Service
 }
 
-type CardRes struct {
-	UID     string `json:"-"`
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Number  string `json:"number"`
-	Holder  string `json:"holder"`
-	ExpDate string `json:"exp_date"`
-	CVV     string `json:"cvv"`
-	Note    string `json:"note"`
+var ErrCardNotFound = errors.New("requested card data not found")
+
+func NewCardService(dataMS data.Service) *CardService {
+	return &CardService{cardMS: card.NewService(dataMS)}
 }
 
-func GetAllCards(ctx context.Context, db storage.IDataRepository, uid string) ([]CardRes, error) {
-	sd, err := db.GetAllDataByType(ctx, uid, storage.SCard)
+func (s *CardService) DeleteCard(ctx context.Context, uid, id string) error {
+	return s.cardMS.DeleteCard(ctx, uid, id)
+}
+
+func (s *CardService) GetAllCards(ctx context.Context, uid string) ([]models.CardResponse, error) {
+	resp, err := s.cardMS.GetAllCards(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 
-	cards := make([]CardRes, 0, len(sd))
-	for _, d := range sd {
-		c, eErr := getCardFromSecureData(d)
-		if eErr != nil {
-			return nil, eErr
-		}
-
-		c.CVV = "***"
-		cards = append(cards, c)
+	cards := make([]models.CardResponse, 0, len(resp))
+	for _, c := range resp {
+		cards = append(cards, s.getResponseFromModel(c))
 	}
 	return cards, nil
 }
 
-func GetCardByID(ctx context.Context, db storage.IDataRepository, uid, id string) (CardRes, error) {
-	d, err := db.GetDataByID(ctx, uid, id)
-	if err != nil {
-		return CardRes{}, nil
+func (s *CardService) GetCardByID(ctx context.Context, uid, id string) (models.CardResponse, error) {
+	res, err := s.cardMS.GetCardByID(ctx, uid, id)
+	return s.getResponseFromModel(res), err
+}
+
+func (s *CardService) StoreCard(ctx context.Context, uid string, card models.CardRequest) (string, error) {
+	return s.cardMS.StoreCard(ctx, uid, s.getModelFromRequest(uid, card))
+}
+
+func (s *CardService) getResponseFromModel(model card.Card) models.CardResponse {
+	return models.CardResponse{
+		UID:     model.UID,
+		ID:      model.ID,
+		Name:    model.Name,
+		Number:  model.Number,
+		Holder:  model.Holder,
+		ExpDate: model.ExpDate,
+		CVV:     model.CVV,
+		Note:    model.Note,
 	}
-	return getCardFromSecureData(d)
 }
 
-func StoreCard(ctx context.Context, db storage.IDataRepository, uid string, req CardReq) (string, error) {
-	card := getCardFromRequest(uid, req)
-	return StoreSecureDataFromPayload(ctx, db, uid, card, storage.SCard)
-}
-
-func getCardFromSecureData(d storage.SecureData) (CardRes, error) {
-	c, err := GetDataFromBytes(d.Data, storage.SCard)
-	if err != nil {
-		return CardRes{}, err
-	}
-
-	ct := c.(CardRes)
-	ct.ID = d.ID
-	return ct, nil
-}
-
-func getCardFromRequest(uid string, req CardReq) CardRes {
-	return CardRes{
+func (s *CardService) getModelFromRequest(uid string, req models.CardRequest) card.Card {
+	return card.Card{
 		UID:     uid,
 		Name:    req.Name,
 		Number:  req.Number,

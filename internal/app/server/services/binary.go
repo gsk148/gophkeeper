@@ -2,68 +2,61 @@ package services
 
 import (
 	"context"
+	"errors"
 
-	"github.com/gsk148/gophkeeper/internal/app/server/storage"
+	"github.com/gsk148/gophkeeper/internal/app/server/models"
+	"github.com/gsk148/gophkeeper/internal/pkg/services/binary"
+	"github.com/gsk148/gophkeeper/internal/pkg/services/data"
 )
 
-type BinaryReq struct {
-	Name string `json:"name"`
-	Data []byte `json:"data"`
-	Note string `json:"note"`
+type BinaryService struct {
+	binaryMS binary.Service
 }
 
-type BinaryRes struct {
-	UID  string `json:"-"`
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Data []byte `json:"data"`
-	Note string `json:"note"`
+var ErrBinaryNotFound = errors.New("requested binary data not found")
+
+func NewBinaryService(dataMS data.Service) *BinaryService {
+	return &BinaryService{binaryMS: binary.NewService(dataMS)}
 }
 
-func GetAllBinaries(ctx context.Context, db storage.IDataRepository, uid string) ([]BinaryRes, error) {
-	sd, err := db.GetAllDataByType(ctx, uid, storage.SBinary)
+func (s *BinaryService) DeleteBinary(ctx context.Context, uid, id string) error {
+	return s.binaryMS.DeleteBinary(ctx, uid, id)
+}
+
+func (s *BinaryService) GetAllBinaries(ctx context.Context, uid string) ([]models.BinaryResponse, error) {
+	resp, err := s.binaryMS.GetAllBinaries(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 
-	binaries := make([]BinaryRes, 0, len(sd))
-	for _, d := range sd {
-		b, dErr := getBinaryFromSecureData(d)
-		if dErr != nil {
-			return nil, err
-		}
-		binaries = append(binaries, b)
+	binaries := make([]models.BinaryResponse, 0, len(resp))
+	for _, c := range resp {
+		binaries = append(binaries, s.getResponseFromModel(c))
 	}
-
 	return binaries, nil
 }
 
-func GetBinaryByID(ctx context.Context, db storage.IDataRepository, uid, id string) (BinaryRes, error) {
-	d, err := db.GetDataByID(ctx, uid, id)
-	if err != nil {
-		return BinaryRes{}, err
+func (s *BinaryService) GetBinaryByID(ctx context.Context, uid, id string) (models.BinaryResponse, error) {
+	resp, err := s.binaryMS.GetBinaryByID(ctx, uid, id)
+	return s.getResponseFromModel(resp), err
+}
+
+func (s *BinaryService) StoreBinary(ctx context.Context, uid string, binary models.BinaryRequest) (string, error) {
+	return s.binaryMS.StoreBinary(ctx, uid, s.getModelFromRequest(uid, binary))
+}
+
+func (s *BinaryService) getResponseFromModel(model binary.Binary) models.BinaryResponse {
+	return models.BinaryResponse{
+		UID:  model.UID,
+		ID:   model.ID,
+		Name: model.Name,
+		Data: model.Data,
+		Note: model.Note,
 	}
-	return getBinaryFromSecureData(d)
 }
 
-func StoreBinary(ctx context.Context, db storage.IDataRepository, uid string, req BinaryReq) (string, error) {
-	bin := getBinaryFromRequest(uid, req)
-	return StoreSecureDataFromPayload(ctx, db, uid, bin, storage.SBinary)
-}
-
-func getBinaryFromSecureData(d storage.SecureData) (BinaryRes, error) {
-	b, err := GetDataFromBytes(d.Data, storage.SBinary)
-	if err != nil {
-		return BinaryRes{}, err
-	}
-
-	bt := b.(BinaryRes)
-	bt.ID = d.ID
-	return bt, nil
-}
-
-func getBinaryFromRequest(uid string, req BinaryReq) BinaryRes {
-	return BinaryRes{
+func (s *BinaryService) getModelFromRequest(uid string, req models.BinaryRequest) binary.Binary {
+	return binary.Binary{
 		UID:  uid,
 		Name: req.Name,
 		Data: req.Data,

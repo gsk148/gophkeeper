@@ -7,14 +7,29 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/gsk148/gophkeeper/internal/app/server/models"
 	"github.com/gsk148/gophkeeper/internal/app/server/services"
-	"github.com/gsk148/gophkeeper/internal/app/server/storage"
 )
+
+func (h Handler) DeleteBinary() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		uid := r.Context().Value(uidKey).(string)
+		id := chi.URLParam(r, "id")
+
+		if err := h.binaryService.DeleteBinary(r.Context(), uid, id); err != nil {
+			handleHTTPError(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(""))
+	}
+}
 
 func (h Handler) GetAllBinaries() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid := r.Context().Value("uid").(string)
-		bs, err := services.GetAllBinaries(r.Context(), h.db, uid)
+		uid := r.Context().Value(uidKey).(string)
+		bs, err := h.binaryService.GetAllBinaries(r.Context(), uid)
 		if err != nil {
 			handleHTTPError(w, err, http.StatusInternalServerError)
 			return
@@ -28,11 +43,11 @@ func (h Handler) GetAllBinaries() http.HandlerFunc {
 
 func (h Handler) GetBinaryByID() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid := r.Context().Value("uid").(string)
+		uid := r.Context().Value(uidKey).(string)
 		id := chi.URLParam(r, "id")
 
-		b, err := services.GetBinaryByID(r.Context(), h.db, uid, id)
-		if err != nil && errors.Is(err, storage.ErrNotFound) {
+		b, err := h.binaryService.GetBinaryByID(r.Context(), uid, id)
+		if err != nil && errors.Is(err, services.ErrBinaryNotFound) {
 			handleHTTPError(w, err, http.StatusInternalServerError)
 			return
 		}
@@ -51,15 +66,15 @@ func (h Handler) GetBinaryByID() http.HandlerFunc {
 
 func (h Handler) StoreBinary() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		uid := r.Context().Value("uid").(string)
+		uid := r.Context().Value(uidKey).(string)
 
-		var req services.BinaryReq
+		var req models.BinaryRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			handleHTTPError(w, err, http.StatusBadRequest)
 			return
 		}
 
-		id, err := services.StoreBinary(r.Context(), h.db, uid, req)
+		id, err := h.binaryService.StoreBinary(r.Context(), uid, req)
 		if err != nil {
 			handleHTTPError(w, err, http.StatusInternalServerError)
 			return
