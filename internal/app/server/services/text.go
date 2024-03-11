@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/gsk148/gophkeeper/internal/app/server/models"
+	"github.com/gsk148/gophkeeper/internal/app/models"
 	"github.com/gsk148/gophkeeper/internal/pkg/services/data"
 	"github.com/gsk148/gophkeeper/internal/pkg/services/text"
 )
@@ -13,19 +13,36 @@ type TextService struct {
 	textMS text.Service
 }
 
-var ErrNotFound = errors.New("requested text data not found")
+var ErrTextNotFound = errors.New("requested text data not found")
 
+// NewTextService returns an instance of the BinaryService with pre-defined text microservice.
 func NewTextService(dataMS data.Service) *TextService {
 	return &TextService{textMS: text.NewService(dataMS)}
 }
 
+// DeleteText removes the stored data with the unique ID.
+// The method removes the data of the specified user only.
 func (s *TextService) DeleteText(ctx context.Context, uid, id string) error {
-	return s.textMS.DeleteText(ctx, uid, id)
+	if uid == "" || id == "" {
+		return ErrBadArguments
+	}
+	err := s.textMS.DeleteText(ctx, uid, id)
+	if errors.Is(err, text.ErrNotFound) {
+		return ErrTextNotFound
+	}
+	return err
 }
 
+// GetAllTexts returns all the user's stored texts.
 func (s *TextService) GetAllTexts(ctx context.Context, uid string) ([]models.TextResponse, error) {
+	if uid == "" {
+		return nil, ErrBadArguments
+	}
 	resp, err := s.textMS.GetAllTexts(ctx, uid)
 	if err != nil {
+		if errors.Is(err, text.ErrNotFound) {
+			return nil, ErrTextNotFound
+		}
 		return nil, err
 	}
 
@@ -36,12 +53,27 @@ func (s *TextService) GetAllTexts(ctx context.Context, uid string) ([]models.Tex
 	return texts, nil
 }
 
+// GetTextByID returns the stored data by the unique ID.
+// The method returns the data of the specified user only.
 func (s *TextService) GetTextByID(ctx context.Context, uid, id string) (models.TextResponse, error) {
+	if uid == "" || id == "" {
+		return models.TextResponse{}, ErrBadArguments
+	}
 	res, err := s.textMS.GetTextByID(ctx, uid, id)
-	return s.getResponseFromModel(res), err
+	if err != nil {
+		if errors.Is(err, text.ErrNotFound) {
+			return models.TextResponse{}, ErrTextNotFound
+		}
+		return models.TextResponse{}, err
+	}
+	return s.getResponseFromModel(res), nil
 }
 
+// StoreText stores the original text via the associated data microservice.
 func (s *TextService) StoreText(ctx context.Context, uid string, req models.TextRequest) (string, error) {
+	if uid == "" || req.Name == "" || req.Data == "" {
+		return "", ErrBadArguments
+	}
 	return s.textMS.StoreText(ctx, s.getModelFromRequest(uid, req))
 }
 

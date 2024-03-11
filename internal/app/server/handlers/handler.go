@@ -2,13 +2,14 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/gsk148/gophkeeper/internal/app/server/models"
+	"github.com/gsk148/gophkeeper/internal/app/models"
 	"github.com/gsk148/gophkeeper/internal/app/server/services"
 	"github.com/gsk148/gophkeeper/internal/pkg/services/data"
 )
@@ -124,6 +125,22 @@ func initHandler(repoURL string) (Handler, error) {
 		passwordService: services.NewPasswordService(dataMS),
 		textService:     services.NewTextService(dataMS),
 	}, nil
+}
+
+func (h Handler) getErrorCode(err error) int {
+	if errors.Is(err, services.ErrBadArguments) {
+		return http.StatusBadRequest
+	}
+	if errors.Is(err, services.ErrWrongCredential) {
+		return http.StatusUnauthorized
+	}
+	if errors.Is(err, services.ErrBinaryNotFound) ||
+		errors.Is(err, services.ErrCardNotFound) ||
+		errors.Is(err, services.ErrPasswordNotFound) ||
+		errors.Is(err, services.ErrTextNotFound) {
+		return http.StatusNotFound
+	}
+	return http.StatusInternalServerError
 }
 
 func handleHTTPError(w http.ResponseWriter, err error, code int) {

@@ -14,6 +14,16 @@ type DBRepo struct {
 }
 
 const (
+	CreateStorageTable = `CREATE TABLE IF NOT EXISTS storage(
+    	id UUID DEFAULT gen_random_uuid(),
+    	uid UUID,
+    	data BYTEA,
+    	type INT,
+    	PRIMARY KEY(id),
+		CONSTRAINT fk_user
+		    FOREIGN KEY (uid)
+		        REFERENCES users(id)
+                    ON DELETE CASCADE )`
 	DeleteData       = "DELETE FROM storage WHERE uid = $1 AND id = $2"
 	GetAllDataByType = "SELECT * FROM storage WHERE uid = $1 AND type = $2"
 	GetDataByID      = "SELECT * FROM storage WHERE uid = $1 AND id = $2"
@@ -32,6 +42,7 @@ func NewDBRepo(url string) (*DBRepo, error) {
 		return &DBRepo{}, err
 	}
 
+	_, err = db.ExecContext(context.Background(), CreateStorageTable)
 	return &DBRepo{db: db}, err
 }
 

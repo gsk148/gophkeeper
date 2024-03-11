@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/gsk148/gophkeeper/internal/app/server/models"
+	"github.com/gsk148/gophkeeper/internal/app/models"
 	"github.com/gsk148/gophkeeper/internal/pkg/services/card"
 	"github.com/gsk148/gophkeeper/internal/pkg/services/data"
 )
@@ -15,17 +15,34 @@ type CardService struct {
 
 var ErrCardNotFound = errors.New("requested card data not found")
 
+// NewCardService returns an instance of the BinaryService with pre-defined card microservice.
 func NewCardService(dataMS data.Service) *CardService {
 	return &CardService{cardMS: card.NewService(dataMS)}
 }
 
+// DeleteCard removes the stored data with the unique ID.
+// The method removes the data of the specified user only.
 func (s *CardService) DeleteCard(ctx context.Context, uid, id string) error {
-	return s.cardMS.DeleteCard(ctx, uid, id)
+	if uid == "" || id == "" {
+		return ErrBadArguments
+	}
+	err := s.cardMS.DeleteCard(ctx, uid, id)
+	if errors.Is(err, card.ErrNotFound) {
+		return ErrCardNotFound
+	}
+	return err
 }
 
+// GetAllCards returns all the user's stored cards.
 func (s *CardService) GetAllCards(ctx context.Context, uid string) ([]models.CardResponse, error) {
+	if uid == "" {
+		return nil, ErrBadArguments
+	}
 	resp, err := s.cardMS.GetAllCards(ctx, uid)
 	if err != nil {
+		if errors.Is(err, card.ErrNotFound) {
+			return nil, ErrCardNotFound
+		}
 		return nil, err
 	}
 
@@ -36,13 +53,25 @@ func (s *CardService) GetAllCards(ctx context.Context, uid string) ([]models.Car
 	return cards, nil
 }
 
+// GetCardByID returns the stored data by the unique ID.
+// The method returns the data of the specified user only.
 func (s *CardService) GetCardByID(ctx context.Context, uid, id string) (models.CardResponse, error) {
+	if uid == "" || id == "" {
+		return models.CardResponse{}, ErrBadArguments
+	}
 	res, err := s.cardMS.GetCardByID(ctx, uid, id)
-	return s.getResponseFromModel(res), err
+	if err != nil {
+		if errors.Is(err, card.ErrNotFound) {
+			return models.CardResponse{}, ErrCardNotFound
+		}
+		return models.CardResponse{}, err
+	}
+	return s.getResponseFromModel(res), nil
 }
 
+// StoreCard stores the original card via the associated data microservice.
 func (s *CardService) StoreCard(ctx context.Context, uid string, card models.CardRequest) (string, error) {
-	return s.cardMS.StoreCard(ctx, uid, s.getModelFromRequest(uid, card))
+	return s.cardMS.StoreCard(ctx, s.getModelFromRequest(uid, card))
 }
 
 func (s *CardService) getResponseFromModel(model card.Card) models.CardResponse {

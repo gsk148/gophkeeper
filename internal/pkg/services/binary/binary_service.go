@@ -12,20 +12,31 @@ type Service struct {
 	dataService data.Service
 }
 
-var ErrNotFound = errors.New("requested binary data not found")
+var (
+	ErrInvalid  = errors.New("passed text data is invalid")
+	ErrNotFound = errors.New("requested binary data not found")
+)
 
+// NewService returns an instance of the Service with pre-defined data microservice.
 func NewService(dataService data.Service) Service {
 	return Service{dataService: dataService}
 }
 
+// DeleteBinary removes the stored data with the unique ID.
+// The method removes the data of the specified user only.
 func (s Service) DeleteBinary(ctx context.Context, uid, id string) error {
-	return s.dataService.DeleteSecureData(ctx, uid, id)
+	err := s.dataService.DeleteSecureData(ctx, uid, id)
+	if errors.Is(err, data.ErrNotFound) {
+		return ErrNotFound
+	}
+	return err
 }
 
+// GetAllBinaries returns all the user's stored binaries.
 func (s Service) GetAllBinaries(ctx context.Context, uid string) ([]Binary, error) {
 	sd, err := s.dataService.GetAllDataByType(ctx, uid, data.SBinary)
 	if err != nil {
-		if errors.Is(err, data.ErrNotFound) {
+		if errors.Is(err, data.ErrNotFound) || errors.Is(err, data.ErrMissingArgs) {
 			return nil, ErrNotFound
 		}
 		return nil, err
@@ -44,7 +55,13 @@ func (s Service) GetAllBinaries(ctx context.Context, uid string) ([]Binary, erro
 	return binaries, nil
 }
 
+// GetBinaryByID returns the stored data by the unique ID.
+// The method returns the data of the specified user only.
 func (s Service) GetBinaryByID(ctx context.Context, uid, id string) (Binary, error) {
+	if uid == "" || id == "" {
+		return Binary{}, ErrNotFound
+	}
+
 	d, err := s.dataService.GetDataByID(ctx, uid, id)
 	if err != nil {
 		if errors.Is(err, data.ErrNotFound) {
@@ -55,11 +72,16 @@ func (s Service) GetBinaryByID(ctx context.Context, uid, id string) (Binary, err
 	return s.getBinaryFromSecureData(d)
 }
 
+// StoreBinary stores the original binary via the associated data microservice.
 func (s Service) StoreBinary(ctx context.Context, uid string, binary Binary) (string, error) {
 	return s.dataService.StoreSecureDataFromPayload(ctx, uid, binary, data.SBinary)
 }
 
 func (s Service) getBinaryFromSecureData(d data.SecureData) (Binary, error) {
+	if len(d.Data) == 0 {
+		return Binary{}, ErrInvalid
+	}
+
 	b, err := s.dataService.GetDataFromBytes(d.Data)
 	if err != nil {
 		return Binary{}, err

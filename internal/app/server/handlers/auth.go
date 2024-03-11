@@ -6,8 +6,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gsk148/gophkeeper/internal/app/server/models"
-	"github.com/gsk148/gophkeeper/internal/app/server/services"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/gsk148/gophkeeper/internal/app/models"
 	"github.com/gsk148/gophkeeper/internal/pkg/services/user"
 )
 
@@ -37,6 +38,7 @@ func (h Handler) Auth(next http.Handler) http.Handler {
 func (h Handler) Login() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cid := getClientID(r)
+		log.Info(cid)
 
 		var req models.UserRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -46,11 +48,7 @@ func (h Handler) Login() http.HandlerFunc {
 
 		token, cid, err := h.authService.Login(r.Context(), cid, req)
 		if err != nil {
-			if errors.Is(err, services.ErrWrongCredential) {
-				handleHTTPError(w, err, http.StatusUnauthorized)
-			} else {
-				handleHTTPError(w, err, http.StatusInternalServerError)
-			}
+			handleHTTPError(w, err, h.getErrorCode(err))
 			return
 		}
 
@@ -68,7 +66,7 @@ func (h Handler) Logout() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cid := getClientID(r)
 		if loggedOut, err := h.authService.Logout(r.Context(), cid); !loggedOut || err != nil {
-			handleHTTPError(w, err, http.StatusInternalServerError)
+			handleHTTPError(w, err, h.getErrorCode(err))
 			return
 		}
 
@@ -89,7 +87,7 @@ func (h Handler) Register() http.HandlerFunc {
 			if errors.Is(err, user.ErrExists) {
 				handleHTTPError(w, err, http.StatusConflict)
 			} else {
-				handleHTTPError(w, err, http.StatusInternalServerError)
+				handleHTTPError(w, err, h.getErrorCode(err))
 			}
 			return
 		}

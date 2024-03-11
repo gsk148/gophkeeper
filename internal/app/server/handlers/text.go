@@ -2,13 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/gsk148/gophkeeper/internal/app/server/models"
-	"github.com/gsk148/gophkeeper/internal/app/server/services"
+	"github.com/gsk148/gophkeeper/internal/app/models"
 )
 
 func (h Handler) DeleteText() http.HandlerFunc {
@@ -17,7 +15,7 @@ func (h Handler) DeleteText() http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 
 		if err := h.textService.DeleteText(r.Context(), uid, id); err != nil {
-			handleHTTPError(w, err, http.StatusInternalServerError)
+			handleHTTPError(w, err, h.getErrorCode(err))
 			return
 		}
 
@@ -31,12 +29,12 @@ func (h Handler) GetAllTexts() http.HandlerFunc {
 		uid := r.Context().Value(uidKey).(string)
 		ts, err := h.textService.GetAllTexts(r.Context(), uid)
 		if err != nil {
-			handleHTTPError(w, err, http.StatusInternalServerError)
+			handleHTTPError(w, err, h.getErrorCode(err))
 			return
 		}
 
 		if err = json.NewEncoder(w).Encode(ts); err != nil {
-			handleHTTPError(w, err, http.StatusInternalServerError)
+			handleHTTPError(w, err, h.getErrorCode(err))
 		}
 	}
 }
@@ -47,8 +45,8 @@ func (h Handler) GetTextByID() http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 
 		t, err := h.textService.GetTextByID(r.Context(), uid, id)
-		if err != nil && errors.Is(err, services.ErrNotFound) {
-			handleHTTPError(w, err, http.StatusInternalServerError)
+		if err != nil {
+			handleHTTPError(w, err, h.getErrorCode(err))
 			return
 		}
 
@@ -59,7 +57,7 @@ func (h Handler) GetTextByID() http.HandlerFunc {
 		}
 
 		if err = json.NewEncoder(w).Encode(t); err != nil {
-			handleHTTPError(w, err, http.StatusInternalServerError)
+			handleHTTPError(w, err, h.getErrorCode(err))
 		}
 	}
 }
@@ -76,7 +74,7 @@ func (h Handler) StoreText() http.HandlerFunc {
 
 		id, err := h.textService.StoreText(r.Context(), uid, req)
 		if err != nil {
-			handleHTTPError(w, err, http.StatusInternalServerError)
+			handleHTTPError(w, err, h.getErrorCode(err))
 			return
 		}
 

@@ -1,11 +1,18 @@
 package client
 
 import (
-	"github.com/gsk148/gophkeeper/internal/app/server/models"
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+
+	"github.com/gsk148/gophkeeper/internal/app/client/config"
+	"github.com/gsk148/gophkeeper/internal/app/models"
 )
 
 type KeeperClientConfig interface {
 	GetAPIAddress() string
+	GetCACertPool() (*x509.CertPool, error)
+	GetCertificate() (tls.Certificate, error)
 }
 
 type KeeperClient interface {
@@ -17,39 +24,39 @@ type KeeperClient interface {
 }
 
 type AuthClient interface {
-	Login(user, password string) error
-	Logout() error
-	Register(user, password string) error
+	Login(ctx context.Context, user, password string) error
+	Logout(ctx context.Context) error
+	Register(ctx context.Context, user, password string) error
 }
 
 type BinaryClient interface {
-	DeleteBinary(id string) error
-	GetAllBinaries() ([]models.BinaryResponse, error)
-	GetBinaryByID(id string) (models.BinaryResponse, error)
-	StoreBinary(name string, data []byte, note string) (string, error)
+	DeleteBinary(ctx context.Context, id string) error
+	GetAllBinaries(ctx context.Context) ([]models.BinaryResponse, error)
+	GetBinaryByID(ctx context.Context, id string) (models.BinaryResponse, error)
+	StoreBinary(ctx context.Context, name string, data []byte, note string) (string, error)
 }
 
 type CardClient interface {
-	DeleteCard(id string) error
-	GetAllCards() ([]models.CardResponse, error)
-	GetCardByID(id string) (models.CardResponse, error)
-	StoreCard(name, number, holder, expDate, cvv, note string) (string, error)
+	DeleteCard(ctx context.Context, id string) error
+	GetAllCards(ctx context.Context) ([]models.CardResponse, error)
+	GetCardByID(ctx context.Context, id string) (models.CardResponse, error)
+	StoreCard(ctx context.Context, name, number, holder, expDate, cvv, note string) (string, error)
 }
 
 type PasswordClient interface {
-	DeletePassword(id string) error
-	GetAllPasswords() ([]models.PasswordResponse, error)
-	GetPasswordByID(id string) (models.PasswordResponse, error)
-	StorePassword(name, user, password, note string) (string, error)
+	DeletePassword(ctx context.Context, id string) error
+	GetAllPasswords(ctx context.Context) ([]models.PasswordResponse, error)
+	GetPasswordByID(ctx context.Context, id string) (models.PasswordResponse, error)
+	StorePassword(ctx context.Context, name, user, password, note string) (string, error)
 }
 
 type TextClient interface {
-	DeleteText(id string) error
-	GetAllTexts() ([]models.TextResponse, error)
-	GetTextByID(id string) (models.TextResponse, error)
-	StoreText(name, data, note string) (string, error)
+	DeleteText(ctx context.Context, id string) error
+	GetAllTexts(ctx context.Context) ([]models.TextResponse, error)
+	GetTextByID(ctx context.Context, id string) (models.TextResponse, error)
+	StoreText(ctx context.Context, name, data, note string) (string, error)
 }
 
-func NewClient() (KeeperClient, error) {
-	return NewHTTPClient()
+func NewClient(cfg *config.ClientConfig) (KeeperClient, error) {
+	return NewHTTPClient(cfg)
 }
