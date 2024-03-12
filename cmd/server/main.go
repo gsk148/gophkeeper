@@ -65,7 +65,7 @@ func getServer(sCfg ServerConfig) (*http.Server, error) {
 
 func startServer(s *http.Server, sCfg ServerConfig) {
 	if sCfg.IsServerSecure() {
-		err := s.ListenAndServeTLS("cert/localhost.crt", "cert/localhost.key")
+		err := s.ListenAndServeTLS("cert/server.crt", "cert/server.key")
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
 		}
