@@ -31,14 +31,6 @@ func MustLoad() *ServerConfig {
 	return &cfg
 }
 
-func New(opts ...func(*ServerConfig)) *ServerConfig {
-	cfg := &ServerConfig{}
-	for _, o := range opts {
-		o(cfg)
-	}
-	return cfg
-}
-
 func (c *ServerConfig) GetRepoURL() string {
 	if c.Database.Host == "" {
 		return ""
