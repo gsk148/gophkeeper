@@ -1,10 +1,6 @@
 package_name="keeperClient"
 build_directory="../../"
 
-version=$(git describe --always --long --dirty)
-date=$(TZ=UTC date)
-commit=$(git log -1 --pretty=format:"%H")
-
 platforms=("windows/386" "windows/amd64" "darwin/amd64" "darwin/arm64" "linux/amd64" "linux/arm64")
 
 for platform in "${platforms[@]}"
