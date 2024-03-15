@@ -1,0 +1,10 @@
+api:
+  host: "localhost"
+  port: 8081
+  route: "/api/v1"
+  secure: true
+
+cert:
+  ca: "cert/CertAuth.crt"
+  cert: "cert/client.crt"
+  key: "cert/client.key"

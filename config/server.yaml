@@ -1,0 +1,11 @@
+database:
+  username: "postgres"
+  password: "postgres"
+  host: "localhost"
+  port: 5432
+  name: "gophkeeper"
+  sslmode: "disable"
+server:
+  host: "localhost"
+  port: 8081
+
